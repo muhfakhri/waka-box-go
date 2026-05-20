@@ -9,6 +9,7 @@ on:
       - master
   schedule:
     - cron: "0 0 * * *"
+  workflow_dispatch: # Fitur tambahan agar kamu bisa menjalankan action ini seacara manual lewat tombol click
 
 jobs:
   build:
@@ -31,8 +32,31 @@ jobs:
           go-version: ^1.14
         id: go
 
-      - name: Check out code into the Go module directory
+      # 1. Checkout repository waka-box-go ini terlebih dahulu
+      - name: Check out code
         uses: actions/checkout@v2
 
-      - name: Update-gist
-        run: go run ./cmd/box/main.go 
+      # 2. Checkout/Clone repository profil GitHub kamu (Ganti 'muhfakhri' jika username kamu berbeda)
+      - name: Check out profile README repo
+        uses: actions/checkout@v2
+        with:
+          repository: muhfakhri/muhfakhri  # <--- Pastikan ini sesuai dengan nama repo profilmu
+          path: profile-repo               # Menyimpan repo profil ke dalam folder sementara bernama 'profile-repo'
+          token: ${{ secrets.GH_TOKEN }}
+
+      # 3. Pindahkan file README.md dari repo profil ke direktori kerja utama agar bisa diisi oleh Go
+      - name: Copy README to workspace
+        run: cp profile-repo/README.md ./README.md
+
+      # 4. Jalankan script Go untuk mengisi statistik WakaTime di antara tag <!-- waka-box -->
+      - name: Run Update Script
+        run: go run ./cmd/box/main.go
+
+      # 5. Kembalikan file README.md yang sudah ter-update ke folder repo profil, lalu Push kembali ke GitHub
+      - name: Commit and Push changes to profile repo
+        run: |
+          cp ./README.md profile-repo/README.md
+          cd profile-repo
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git diff --quiet && git diff --staged --quiet || (git commit -am "Update WakaTime Stats" && git push)
